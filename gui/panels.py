@@ -1,26 +1,25 @@
 """
 gui/panels.py
 =============
-Sidebar panel widgets for the 8by8 AI CHESS LAB GUI.
+Sidebar panel components — design.md warm-minimalist system.
 
-Panels:
-  - EvalBar: vertical evaluation bar (White/Black advantage)
-  - MoveHistoryPanel: scrollable SAN move list
-  - CapturedPiecesPanel: shows taken pieces
-  - AIThinkingPanel: live search stats display
-  - EvalBreakdownPanel: component-by-component evaluation
-  - TopMovesPanel: ranked AI candidate moves
-  - AIExplanationPanel: natural-language move explanation
-  - GameInfoPanel: game mode, result, clocks
+Typography rules (design.md §3):
+  Section eyebrow  → DM Mono, 11px, 500, 0.1em spacing, uppercase, --ink4
+  Values / numbers → DM Mono, 12px, --ink2
+  Labels           → DM Sans, 12px, --ink3
+  Primary text     → DM Sans, 13px, --ink
+
+Radius rules (design.md §4):
+  Cards / panels  → --r-lg = 18px outer, --r = 10px inner
+  Buttons / tags  → --r-sm = 6px
 """
-
 from __future__ import annotations
 from typing import Optional
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QScrollArea, QListWidget, QListWidgetItem, QProgressBar,
-    QSizePolicy, QGridLayout,
+    QScrollArea, QListWidget, QListWidgetItem, QSizePolicy,
+    QGridLayout,
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QPainter, QColor, QFont, QPen, QLinearGradient
@@ -29,172 +28,179 @@ from engine.pieces import Color, Piece, PieceType
 from engine.moves import Move
 from ai.search import SearchStats
 from ai.evaluator import EvalBreakdown
-from gui.theme import Theme, FONT_MONO
+from gui.theme import Theme, FONT_MONO, FONT_UI
 
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
+# ─── Low-level helpers ────────────────────────────────────────────────────────
 
-def _panel(title: str = "", parent=None) -> tuple[QFrame, QVBoxLayout]:
-    """Create a styled panel frame with optional title."""
+def _eyebrow(text: str, parent=None) -> QLabel:
+    """Section eyebrow label — DM Mono 11px uppercase ink4."""
+    lbl = QLabel(text.upper(), parent)
+    t = Theme.current()
+    lbl.setStyleSheet(
+        f"color:{t.ink4}; font-family:{FONT_MONO}; font-size:10px;"
+        f"font-weight:500; letter-spacing:0.1em; background:transparent;"
+    )
+    return lbl
+
+def _ink_label(text: str = "", size: int = 13, mono: bool = False,
+               muted: bool = False, bold: bool = False, parent=None) -> QLabel:
+    lbl = QLabel(text, parent)
+    t   = Theme.current()
+    col = t.ink3 if muted else t.ink2
+    ff  = FONT_MONO if mono else FONT_UI
+    wt  = "600" if bold else ("500" if mono else "400")
+    lbl.setStyleSheet(
+        f"color:{col}; font-size:{size}px; font-weight:{wt};"
+        f"font-family:{ff}; background:transparent;"
+    )
+    return lbl
+
+def _divider() -> QFrame:
+    sep = QFrame()
+    sep.setFixedHeight(1)
+    t = Theme.current()
+    sep.setStyleSheet(f"background:{t.border}; border:none;")
+    return sep
+
+
+# ─── Panel base ───────────────────────────────────────────────────────────────
+
+def _panel(parent=None) -> tuple[QFrame, QVBoxLayout]:
+    """Standard surface panel with border and radius."""
     frame = QFrame(parent)
     frame.setObjectName("panel")
     layout = QVBoxLayout(frame)
-    layout.setContentsMargins(12, 10, 12, 10)
-    layout.setSpacing(6)
-    if title:
-        lbl = QLabel(title)
-        lbl.setObjectName("panelTitle")
-        c = Theme.current()
-        lbl.setStyleSheet(f"color: {c.text_muted}; font-size: 10px; "
-                          f"font-weight: 700; letter-spacing: 1px; "
-                          f"text-transform: uppercase; background: transparent;")
-        layout.addWidget(lbl)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(0)
     return frame, layout
-
-def _sep() -> QFrame:
-    sep = QFrame()
-    sep.setFrameShape(QFrame.HLine)
-    c = Theme.current()
-    sep.setStyleSheet(f"background: {c.separator}; max-height: 1px; border: none;")
-    return sep
-
-def _label(text: str, bold: bool = False, size: int = 13,
-           color: str = "", muted: bool = False) -> QLabel:
-    lbl = QLabel(text)
-    c = Theme.current()
-    fg = color if color else (c.text_secondary if muted else c.text_primary)
-    weight = "700" if bold else "400"
-    lbl.setStyleSheet(f"color: {fg}; font-size: {size}px; "
-                      f"font-weight: {weight}; background: transparent;")
-    return lbl
 
 
 # ─── Evaluation Bar ───────────────────────────────────────────────────────────
 
 class EvalBar(QWidget):
     """
-    Vertical evaluation bar.
-    Shows White advantage at top (light color) / Black advantage at bottom (dark).
+    Slim vertical evaluation bar.
+    White advantage = top segment in ink (warm white in dark).
+    Black advantage = bottom segment in surface.
     """
-
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setFixedWidth(28)
+        self.setFixedWidth(20)
         self.setMinimumHeight(200)
-        self._score: float = 0.0    # centipawns, from White's perspective
+        self._score: float = 0.0
 
     def set_score(self, score_cp: int) -> None:
         self._score = max(-1500, min(1500, score_cp))
         self.update()
 
-    def paintEvent(self, event) -> None:
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        c = Theme.current()
+    def paintEvent(self, _e) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        t = Theme.current()
         w, h = self.width(), self.height()
 
-        # Background
-        painter.fillRect(0, 0, w, h, QColor(c.bg_medium))
+        # Track background
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(t.surface))
+        p.drawRoundedRect(4, 0, w - 8, h, 3, 3)
 
-        # White fraction (clamp to 0-1)
-        white_frac = max(0.05, min(0.95, 0.5 + self._score / 3000))
-        white_h = int(h * (1 - white_frac))   # top portion = Black
+        # White fraction
+        frac  = max(0.04, min(0.96, 0.5 + self._score / 3000))
+        wh    = int(h * frac)      # white portion height (grows from bottom)
+        bh    = h - wh             # black portion height (top)
 
-        # Black portion
-        painter.fillRect(2, 2, w-4, white_h - 2, QColor(c.eval_black))
-        # White portion
-        painter.fillRect(2, white_h, w-4, h - white_h - 2, QColor(c.eval_white))
+        # Black portion (top)
+        p.setBrush(QColor(t.ink).darker(160 if not Theme.is_dark() else 100))
+        p.drawRoundedRect(4, 0, w - 8, bh, 3, 3)
+
+        # White portion (bottom)
+        p.setBrush(QColor(t.sq_light).lighter(110))
+        p.drawRoundedRect(4, bh, w - 8, wh, 3, 3)
 
         # Score text
-        score_pawns = abs(self._score / 100)
-        text = f"{score_pawns:.1f}" if score_pawns < 10 else f"{int(score_pawns)}"
-        painter.setPen(QColor(c.text_secondary))
-        font = QFont("Segoe UI", 7, QFont.Bold)
-        painter.setFont(font)
-        y = white_h + 10 if self._score >= 0 else white_h - 4
-        painter.drawText(0, y, w, 12, Qt.AlignCenter, text)
-        painter.end()
+        if abs(self._score) > 15:
+            score_str = f"{abs(self._score / 100):.0f}"
+            p.setPen(QColor(t.ink4))
+            font = QFont("DM Mono, Consolas", 7)
+            p.setFont(font)
+            ty = bh + 10 if self._score >= 0 else bh - 4
+            ty = max(10, min(h - 4, ty))
+            p.drawText(0, ty, w, 10, Qt.AlignCenter, score_str)
+        p.end()
 
 
 # ─── Captured Pieces ──────────────────────────────────────────────────────────
 
 class CapturedPiecesPanel(QFrame):
-    """Shows pieces captured by each side."""
-
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 6, 8, 6)
-        layout.setSpacing(2)
-
-        self._white_label = QLabel("White captured: —")
-        self._black_label = QLabel("Black captured: —")
-        for lbl in (self._white_label, self._black_label):
-            c = Theme.current()
-            lbl.setStyleSheet(f"color: {c.text_secondary}; font-size: 12px; "
-                              f"background: transparent;")
+        layout.setContentsMargins(16, 10, 16, 10)
+        layout.setSpacing(3)
+        t = Theme.current()
+        self._w = QLabel("—")
+        self._b = QLabel("—")
+        for lbl in (self._w, self._b):
+            lbl.setStyleSheet(
+                f"color:{t.ink3}; font-size:13px; background:transparent; letter-spacing:1px;"
+            )
             layout.addWidget(lbl)
 
-    def update_captured(self, white_captured: list[Piece],
-                        black_captured: list[Piece]) -> None:
-        order = [PieceType.QUEEN, PieceType.ROOK, PieceType.BISHOP,
-                 PieceType.KNIGHT, PieceType.PAWN]
-        def fmt(pieces: list[Piece]) -> str:
-            if not pieces:
-                return "—"
-            sorted_p = sorted(pieces, key=lambda p: order.index(p.piece_type)
-                              if p.piece_type in order else 99)
-            return " ".join(p.symbol for p in sorted_p)
-
-        self._white_label.setText(f"⚪ {fmt(white_captured)}")
-        self._black_label.setText(f"⚫ {fmt(black_captured)}")
+    def update_captured(self, wc: list[Piece], bc: list[Piece]) -> None:
+        order = [PieceType.QUEEN, PieceType.ROOK,
+                 PieceType.BISHOP, PieceType.KNIGHT, PieceType.PAWN]
+        def fmt(pieces):
+            if not pieces: return "—"
+            s = sorted(pieces, key=lambda p: order.index(p.piece_type)
+                       if p.piece_type in order else 9)
+            return " ".join(p.symbol for p in s)
+        self._w.setText(fmt(wc))
+        self._b.setText(fmt(bc))
 
 
 # ─── Move History ─────────────────────────────────────────────────────────────
 
 class MoveHistoryPanel(QFrame):
-    """Scrollable list of moves in standard algebraic notation."""
+    """Monospace move list with alternating row tints."""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("panel")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        title = _label("MOVES", bold=True, size=10, muted=True)
-        title.setContentsMargins(12, 8, 12, 4)
-        layout.addWidget(title)
+        # Header
+        header = QWidget()
+        header.setFixedHeight(36)
+        t = Theme.current()
+        header.setStyleSheet(f"background:{t.surface}; border-radius:0px;")
+        hl = QHBoxLayout(header)
+        hl.setContentsMargins(16, 0, 16, 0)
+        hl.addWidget(_eyebrow("Moves"))
+        hl.addStretch()
+        layout.addWidget(header)
+        layout.addWidget(_divider())
 
         self._list = QListWidget()
         self._list.setSpacing(0)
         self._list.setSelectionMode(QListWidget.NoSelection)
-        layout.addWidget(self._list)
-
-        self._moves: list[tuple[str, str]] = []   # [(white_san, black_san)]
+        layout.addWidget(self._list, 1)
 
     def update_moves(self, sans: list[str]) -> None:
         self._list.clear()
-        c = Theme.current()
-        pairs: list[tuple[str, str]] = []
+        t  = Theme.current()
         for i in range(0, len(sans), 2):
             w = sans[i]
-            b = sans[i+1] if i+1 < len(sans) else ""
-            pairs.append((w, b))
-
-        for i, (w, b) in enumerate(pairs):
-            # Build one row: "1. e4   e5"
-            num_lbl = f"{i+1}."
-            row_text = f"{num_lbl:<4} {w:<8} {b}"
-            item = QListWidgetItem(row_text)
-            item.setFont(QFont(FONT_MONO.split(",")[0].strip('"'), 11))
-            item.setForeground(QColor(c.text_primary))
-            if i % 2 == 0:
-                item.setBackground(QColor(c.bg_medium))
-            else:
-                item.setBackground(QColor(c.bg_dark))
+            b = sans[i + 1] if i + 1 < len(sans) else ""
+            num = f"{i//2 + 1}."
+            text = f"{num:<5}{w:<9}{b}"
+            item = QListWidgetItem(text)
+            bg = t.surface if i % 4 == 0 else t.bg
+            item.setBackground(QColor(bg))
+            item.setForeground(QColor(t.ink2))
             self._list.addItem(item)
-
-        # Scroll to bottom
         self._list.scrollToBottom()
 
     def clear(self) -> None:
@@ -204,273 +210,351 @@ class MoveHistoryPanel(QFrame):
 # ─── AI Thinking Panel ────────────────────────────────────────────────────────
 
 class AIThinkingPanel(QFrame):
-    """
-    Live AI search statistics display.
-    Updates during search via progress callbacks.
-    """
+    """Live search statistics — monospace values, sans labels."""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("panel")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(6)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        title = _label("AI ENGINE", bold=True, size=10, muted=True)
-        layout.addWidget(title)
-        layout.addWidget(_sep())
+        # Header row
+        hdr = QWidget()
+        hdr.setFixedHeight(36)
+        t = Theme.current()
+        hdr.setStyleSheet(f"background:{t.surface};")
+        hl = QHBoxLayout(hdr)
+        hl.setContentsMargins(16, 0, 16, 0)
+        hl.addWidget(_eyebrow("Engine"))
+        hl.addStretch()
+        self._status_dot = QLabel("●")
+        self._status_dot.setStyleSheet(
+            f"color:{t.ink4}; font-size:8px; background:transparent;"
+        )
+        hl.addWidget(self._status_dot)
+        layout.addWidget(hdr)
+        layout.addWidget(_divider())
 
-        grid = QGridLayout()
-        grid.setSpacing(4)
-        grid.setColumnMinimumWidth(0, 110)
+        # Grid of stats
+        body = QWidget()
+        body.setStyleSheet(f"background:{t.surface};")
+        grid = QGridLayout(body)
+        grid.setContentsMargins(16, 12, 16, 12)
+        grid.setVerticalSpacing(8)
+        grid.setHorizontalSpacing(12)
+        grid.setColumnStretch(1, 1)
 
-        def _row(label: str, row: int):
-            lbl = _label(label, muted=True, size=11)
-            val = _label("—", size=12)
-            grid.addWidget(lbl, row, 0)
-            grid.addWidget(val, row, 1)
-            return val
+        rows = [
+            ("Best move",  "_v_best"),
+            ("Evaluation", "_v_eval"),
+            ("Depth",      "_v_depth"),
+            ("Nodes",      "_v_nodes"),
+            ("Nodes / s",  "_v_nps"),
+            ("Time",       "_v_time"),
+            ("TT hits",    "_v_tt"),
+        ]
+        self._vals: dict[str, QLabel] = {}
+        for row_i, (label, attr) in enumerate(rows):
+            lbl = _ink_label(label, size=11, muted=True)
+            val = _ink_label("—", size=12, mono=True)
+            val.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            grid.addWidget(lbl, row_i, 0)
+            grid.addWidget(val, row_i, 1)
+            self._vals[attr] = val
 
-        self._best_move_lbl  = _row("Best move",    0)
-        self._score_lbl      = _row("Evaluation",   1)
-        self._depth_lbl      = _row("Depth",        2)
-        self._nodes_lbl      = _row("Nodes",        3)
-        self._nps_lbl        = _row("Nodes/sec",    4)
-        self._time_lbl       = _row("Time",         5)
-        self._tt_hits_lbl    = _row("TT hits",      6)
+        layout.addWidget(body)
 
-        layout.addLayout(grid)
-
-        # Status indicator
-        self._status_lbl = _label("Idle", size=11, muted=True)
-        layout.addWidget(self._status_lbl)
-
-        # Thinking indicator animation
-        self._dots = 0
         self._dot_timer = QTimer(self)
-        self._dot_timer.timeout.connect(self._tick_dots)
+        self._dot_timer.timeout.connect(self._tick)
+        self._dots = 0
 
     def set_thinking(self, thinking: bool) -> None:
+        t = Theme.current()
         if thinking:
-            self._dot_timer.start(400)
-            c = Theme.current()
-            self._status_lbl.setStyleSheet(
-                f"color: {c.accent}; font-size: 11px; background: transparent;")
+            self._dot_timer.start(450)
+            self._status_dot.setStyleSheet(
+                f"color:{t.warning}; font-size:8px; background:transparent;"
+            )
         else:
             self._dot_timer.stop()
-            self._status_lbl.setText("Search complete")
-            c = Theme.current()
-            self._status_lbl.setStyleSheet(
-                f"color: {c.success}; font-size: 11px; background: transparent;")
+            self._status_dot.setStyleSheet(
+                f"color:{t.success}; font-size:8px; background:transparent;"
+            )
+            self._status_dot.setText("●")
 
-    def _tick_dots(self) -> None:
+    def _tick(self) -> None:
         self._dots = (self._dots + 1) % 4
-        c = Theme.current()
-        self._status_lbl.setText("Thinking" + "." * self._dots)
+        self._status_dot.setText("●" + "·" * self._dots)
 
     def update_stats(self, stats: SearchStats) -> None:
-        bm    = stats.best_move.uci() if stats.best_move else "—"
-        score = stats.best_score / 100
-        sign  = "+" if score >= 0 else ""
+        t  = Theme.current()
+        bm = stats.best_move.uci() if stats.best_move else "—"
+        sc = stats.best_score / 100
+        sg = "+" if sc >= 0 else ""
+        self._vals["_v_best"].setText(bm)
+        self._vals["_v_eval"].setText(f"{sg}{sc:.2f}")
+        self._vals["_v_depth"].setText(str(stats.depth_reached))
+        self._vals["_v_nodes"].setText(f"{stats.total_nodes:,}")
+        self._vals["_v_nps"].setText(f"{stats.nodes_per_sec:,.0f}")
+        self._vals["_v_time"].setText(f"{stats.elapsed:.2f}s")
+        self._vals["_v_tt"].setText(f"{stats.tt_hits:,}")
 
-        self._best_move_lbl.setText(bm)
-        self._score_lbl.setText(f"{sign}{score:.2f}")
-        self._depth_lbl.setText(str(stats.depth_reached))
-        self._nodes_lbl.setText(f"{stats.total_nodes:,}")
-        self._nps_lbl.setText(f"{stats.nodes_per_sec:,.0f}")
-        self._time_lbl.setText(f"{stats.elapsed:.2f}s")
-        self._tt_hits_lbl.setText(f"{stats.tt_hits:,}")
+        # Color-code eval
+        col = t.success if sc > 0.3 else (t.danger if sc < -0.3 else t.ink2)
+        self._vals["_v_eval"].setStyleSheet(
+            f"color:{col}; font-size:12px; font-weight:500;"
+            f"font-family:{FONT_MONO}; background:transparent;"
+        )
 
     def reset(self) -> None:
-        for lbl in (self._best_move_lbl, self._score_lbl, self._depth_lbl,
-                    self._nodes_lbl, self._nps_lbl, self._time_lbl,
-                    self._tt_hits_lbl):
-            lbl.setText("—")
-        self._status_lbl.setText("Idle")
+        for v in self._vals.values():
+            v.setText("—")
+        t = Theme.current()
+        self._status_dot.setStyleSheet(
+            f"color:{t.ink4}; font-size:8px; background:transparent;"
+        )
 
 
-# ─── Top Moves Panel ─────────────────────────────────────────────────────────
+# ─── Top Moves Panel ──────────────────────────────────────────────────────────
 
 class TopMovesPanel(QFrame):
-    """Shows ranked candidate moves from the AI search."""
+    """Ranked candidate moves — monospace, ink scale."""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("panel")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(4)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        title = _label("TOP CANDIDATES", bold=True, size=10, muted=True)
-        layout.addWidget(title)
-        layout.addWidget(_sep())
+        hdr = QWidget()
+        hdr.setFixedHeight(36)
+        t = Theme.current()
+        hdr.setStyleSheet(f"background:{t.surface};")
+        hl = QHBoxLayout(hdr)
+        hl.setContentsMargins(16, 0, 16, 0)
+        hl.addWidget(_eyebrow("Candidates"))
+        hl.addStretch()
+        layout.addWidget(hdr)
+        layout.addWidget(_divider())
 
+        body = QWidget()
+        body.setStyleSheet(f"background:{t.surface};")
+        bl = QVBoxLayout(body)
+        bl.setContentsMargins(16, 10, 16, 10)
+        bl.setSpacing(5)
         self._rows: list[QLabel] = []
-        for _ in range(5):
-            lbl = QLabel("—")
-            c = Theme.current()
-            lbl.setStyleSheet(f"color: {c.text_primary}; font-size: 12px; "
-                              f"font-family: {FONT_MONO}; background: transparent;")
-            layout.addWidget(lbl)
-            self._rows.append(lbl)
+        for i in range(5):
+            row = QLabel("—")
+            alpha = 1.0 if i == 0 else max(0.35, 1.0 - i * 0.18)
+            col = self._alpha_color(t.ink if i == 0 else t.ink2, alpha)
+            row.setStyleSheet(
+                f"color:{col}; font-size:12px; font-weight:{'600' if i==0 else '400'};"
+                f"font-family:{FONT_MONO}; background:transparent;"
+            )
+            bl.addWidget(row)
+            self._rows.append(row)
+        layout.addWidget(body)
 
-        layout.addStretch()
+    @staticmethod
+    def _alpha_color(hex_col: str, alpha: float) -> str:
+        return hex_col  # Qt labels use full color; opacity via stylesheet not supported
 
     def update_moves(self, top_moves: list[tuple[Move, int]]) -> None:
-        c = Theme.current()
-        for i, lbl in enumerate(self._rows):
+        t = Theme.current()
+        for i, row in enumerate(self._rows):
             if i < len(top_moves):
                 move, score = top_moves[i]
-                score_pawns = score / 100
-                sign = "+" if score_pawns >= 0 else ""
-                medal = ["①", "②", "③", "④", "⑤"][i]
-                text = f"{medal} {move.uci():<8} {sign}{score_pawns:.2f}"
-                color = c.accent if i == 0 else c.text_primary
-                lbl.setStyleSheet(
-                    f"color: {color}; font-size: 12px; "
-                    f"font-family: {FONT_MONO}; background: transparent;")
-                lbl.setText(text)
+                s = score / 100
+                sign = "+" if s >= 0 else ""
+                medal = ["1.", "2.", "3.", "4.", "5."][i]
+                row.setText(f"{medal}  {move.uci():<8}  {sign}{s:.2f}")
+                col = t.ink if i == 0 else t.ink3
+                wt  = "600" if i == 0 else "400"
+                row.setStyleSheet(
+                    f"color:{col}; font-size:12px; font-weight:{wt};"
+                    f"font-family:{FONT_MONO}; background:transparent;"
+                )
             else:
-                lbl.setText("—")
+                row.setText("—")
 
     def clear(self) -> None:
-        for lbl in self._rows:
-            lbl.setText("—")
+        for r in self._rows:
+            r.setText("—")
 
 
-# ─── Evaluation Breakdown Panel ───────────────────────────────────────────────
+# ─── Eval Breakdown Panel ─────────────────────────────────────────────────────
 
 class EvalBreakdownPanel(QFrame):
-    """Shows component-by-component evaluation breakdown."""
+    """Component-by-component evaluation grid."""
+
+    _COMPONENTS = [
+        ("Material",       "_material"),
+        ("Position",       "_position"),
+        ("Mobility",       "_mobility"),
+        ("King Safety",    "_king_safety"),
+        ("Center",         "_center"),
+        ("Pawn Structure", "_pawn_struct"),
+        ("Piece Activity", "_piece_activity"),
+    ]
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("panel")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(4)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        title = _label("EVALUATION", bold=True, size=10, muted=True)
-        layout.addWidget(title)
-        layout.addWidget(_sep())
+        hdr = QWidget()
+        hdr.setFixedHeight(36)
+        t = Theme.current()
+        hdr.setStyleSheet(f"background:{t.surface};")
+        hl = QHBoxLayout(hdr)
+        hl.setContentsMargins(16, 0, 16, 0)
+        hl.addWidget(_eyebrow("Evaluation"))
+        hl.addStretch()
+        layout.addWidget(hdr)
+        layout.addWidget(_divider())
 
-        self._grid = QGridLayout()
-        self._grid.setSpacing(3)
-        self._grid.setColumnMinimumWidth(0, 100)
-        layout.addLayout(self._grid)
+        body = QWidget()
+        body.setStyleSheet(f"background:{t.surface};")
+        grid = QGridLayout(body)
+        grid.setContentsMargins(16, 10, 16, 10)
+        grid.setVerticalSpacing(7)
+        grid.setHorizontalSpacing(12)
+        grid.setColumnStretch(1, 1)
 
-        self._bars:   dict[str, QProgressBar] = {}
-        self._labels: dict[str, QLabel]       = {}
-
-        components = [
-            "Material", "Position", "Mobility",
-            "King Safety", "Center Control",
-            "Pawn Structure", "Piece Activity",
-        ]
-        for row, name in enumerate(components):
-            name_lbl = _label(name, muted=True, size=11)
-            val_lbl  = _label("+0.00", size=11)
+        self._labels: dict[str, QLabel] = {}
+        for row_i, (name, key) in enumerate(self._COMPONENTS):
+            name_lbl = _ink_label(name, size=11, muted=True)
+            val_lbl  = _ink_label("—", size=11, mono=True)
             val_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            self._grid.addWidget(name_lbl, row, 0)
-            self._grid.addWidget(val_lbl,  row, 1)
-            self._labels[name] = val_lbl
-
-        layout.addStretch()
+            grid.addWidget(name_lbl, row_i, 0)
+            grid.addWidget(val_lbl,  row_i, 1)
+            self._labels[key] = val_lbl
+        layout.addWidget(body)
 
     def update_breakdown(self, bd: EvalBreakdown) -> None:
-        d = bd.to_dict()
-        c = Theme.current()
-        for name, lbl in self._labels.items():
-            score = d.get(name, 0.0)
+        t = Theme.current()
+        mapping = {
+            "_material":      bd.material,
+            "_position":      bd.position,
+            "_mobility":      bd.mobility,
+            "_king_safety":   bd.king_safety,
+            "_center":        bd.center,
+            "_pawn_struct":   bd.pawn_struct,
+            "_piece_activity":bd.piece_activity,
+        }
+        for key, raw in mapping.items():
+            score = raw / 100
             sign  = "+" if score >= 0 else ""
             text  = f"{sign}{score:.2f}"
-            color = c.success if score > 0.1 else (
-                    c.danger if score < -0.1 else c.text_secondary)
-            lbl.setStyleSheet(
-                f"color: {color}; font-size: 11px; background: transparent;")
-            lbl.setText(text)
+            col   = (t.success if score > 0.05
+                     else t.danger if score < -0.05
+                     else t.ink3)
+            self._labels[key].setText(text)
+            self._labels[key].setStyleSheet(
+                f"color:{col}; font-size:11px; font-weight:500;"
+                f"font-family:{FONT_MONO}; background:transparent;"
+            )
 
     def clear(self) -> None:
-        for lbl in self._labels.values():
-            c = Theme.current()
-            lbl.setStyleSheet(
-                f"color: {c.text_muted}; font-size: 11px; background: transparent;")
-            lbl.setText("—")
+        for v in self._labels.values():
+            v.setText("—")
 
 
 # ─── AI Explanation Panel ─────────────────────────────────────────────────────
 
 class AIExplanationPanel(QFrame):
-    """Displays natural-language AI move explanation."""
+    """Natural-language move explanation."""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("panel")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 10, 12, 10)
-        layout.setSpacing(6)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        title = _label("AI REASONING", bold=True, size=10, muted=True)
-        layout.addWidget(title)
-        layout.addWidget(_sep())
+        hdr = QWidget()
+        hdr.setFixedHeight(36)
+        t = Theme.current()
+        hdr.setStyleSheet(f"background:{t.surface};")
+        hl = QHBoxLayout(hdr)
+        hl.setContentsMargins(16, 0, 16, 0)
+        hl.addWidget(_eyebrow("Reasoning"))
+        hl.addStretch()
+        layout.addWidget(hdr)
+        layout.addWidget(_divider())
 
-        self._text = QLabel("Make a move to see AI reasoning...")
-        c = Theme.current()
-        self._text.setStyleSheet(
-            f"color: {c.text_secondary}; font-size: 12px; "
-            f"background: transparent; line-height: 1.5;")
+        body = QWidget()
+        body.setStyleSheet(f"background:{t.surface};")
+        bl = QVBoxLayout(body)
+        bl.setContentsMargins(16, 12, 16, 14)
+
+        self._text = QLabel("Waiting for move…")
         self._text.setWordWrap(True)
         self._text.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-        layout.addWidget(self._text)
-        layout.addStretch()
+        self._text.setStyleSheet(
+            f"color:{t.ink3}; font-size:12px; line-height:1.6;"
+            f"background:transparent; font-family:{FONT_UI};"
+        )
+        bl.addWidget(self._text)
+        layout.addWidget(body)
 
     def set_explanation(self, text: str) -> None:
         self._text.setText(text)
 
     def clear(self) -> None:
-        self._text.setText("Make a move to see AI reasoning...")
+        self._text.setText("Waiting for move…")
 
 
 # ─── Game Status Panel ────────────────────────────────────────────────────────
 
 class GameStatusPanel(QFrame):
-    """Displays current game state: whose turn, check, result."""
+    """Turn indicator, check warning, result."""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("statusbar")
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 8, 12, 8)
-        layout.setSpacing(12)
+        layout.setContentsMargins(16, 0, 16, 0)
+        layout.setSpacing(10)
 
-        self._turn_lbl  = _label("White to move", bold=True, size=13)
-        self._check_lbl = _label("", size=12)
-        self._result_lbl= _label("", bold=True, size=12)
+        t = Theme.current()
+        self._turn = QLabel("White to move")
+        self._turn.setStyleSheet(
+            f"color:{t.ink}; font-size:13px; font-weight:600; background:transparent;"
+        )
+        self._check = QLabel("")
+        self._check.setStyleSheet(
+            f"color:{t.danger}; font-size:12px; font-weight:600; background:transparent;"
+        )
+        self._result = QLabel("")
+        self._result.setStyleSheet(
+            f"color:{t.ink3}; font-size:12px; background:transparent;"
+        )
 
-        layout.addWidget(self._turn_lbl)
-        layout.addWidget(self._check_lbl)
+        layout.addWidget(self._turn)
+        layout.addWidget(self._check)
         layout.addStretch()
-        layout.addWidget(self._result_lbl)
+        layout.addWidget(self._result)
 
-    def update_status(self, color: Color, in_check: bool,
-                      result_text: str = "") -> None:
-        c = Theme.current()
+    def update_status(self, color: Color, in_check: bool, result_text: str = "") -> None:
+        t = Theme.current()
         side = "White" if color == Color.WHITE else "Black"
-        self._turn_lbl.setText(f"{side} to move")
 
         if result_text:
-            self._turn_lbl.setStyleSheet(
-                f"color: {c.text_muted}; font-size: 13px; "
-                f"font-weight: 700; background: transparent;")
-            self._result_lbl.setText(result_text)
-            self._result_lbl.setStyleSheet(
-                f"color: {c.accent}; font-size: 12px; "
-                f"font-weight: 700; background: transparent;")
+            self._turn.setText(result_text)
+            self._turn.setStyleSheet(
+                f"color:{t.ink2}; font-size:13px; font-weight:600; background:transparent;"
+            )
+            self._check.setText("")
+            self._result.setText("")
         else:
-            self._turn_lbl.setStyleSheet(
-                f"color: {c.text_primary}; font-size: 13px; "
-                f"font-weight: 700; background: transparent;")
-            self._result_lbl.setText("")
-
-        if in_check and not result_text:
-            self._check_lbl.setText("⚠ Check!")
-            self._check_lbl.setStyleSheet(
-                f"color: {c.danger}; font-size: 12px; "
-                f"font-weight: 700; background: transparent;")
-        else:
-            self._check_lbl.setText("")
+            self._turn.setText(f"{side} to move")
+            self._turn.setStyleSheet(
+                f"color:{t.ink}; font-size:13px; font-weight:600; background:transparent;"
+            )
+            self._check.setText("Check  !" if in_check else "")
+            self._result.setText("")

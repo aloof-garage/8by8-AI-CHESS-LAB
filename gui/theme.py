@@ -1,347 +1,229 @@
 """
 gui/theme.py
 ============
-Color system and theme management for 8by8 AI CHESS LAB GUI.
+Design system for 8by8 AI CHESS LAB.
 
-Supports Dark Mode and Light Mode with a consistent design language:
-  - Minimal, modern, premium aesthetic
-  - Carefully tuned color palette
-  - Typography scale
-  - Spacing and sizing constants
+Tokens derived directly from design.md:
+  Colors  — warm monochromatic palette (light parchment / near-black)
+  Type    — DM Sans (UI) + DM Mono (technical/data)
+  Radius  — --r-sm 6px / --r 10px / --r-lg 18px
+  Shadow  — two-level system
+  Motion  — .2s / .4s cubic-bezier(.4,0,.2,1)
 """
-
 from __future__ import annotations
 from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class ColorPalette:
-    # Window / background layers
-    bg_darkest:     str    # deepest background
-    bg_dark:        str    # panel backgrounds
-    bg_medium:      str    # card / widget backgrounds
-    bg_light:       str    # hover states / borders
-    bg_highlight:   str    # selected / active states
-
-    # Text
-    text_primary:   str
-    text_secondary: str
-    text_muted:     str
-    text_inverse:   str
-
-    # Accent
-    accent:         str    # primary accent (blue)
-    accent_hover:   str
-    accent_dim:     str
-
-    # Status colors
-    success:        str
-    warning:        str
-    danger:         str
-    info:           str
-
-    # Board squares
-    board_light:    str
-    board_dark:     str
-    board_border:   str
-
-    # Board highlights
-    hl_selected:    str    # selected piece
-    hl_legal:       str    # legal move dot
-    hl_last_from:   str    # last move source
-    hl_last_to:     str    # last move destination
-    hl_check:       str    # king in check
-
-    # Piece colors (for drawn pieces)
-    piece_white:    str
-    piece_black:    str
-    piece_outline:  str
-
-    # Evaluation bar
-    eval_white:     str
-    eval_black:     str
-
-    # Panel separator
-    separator:      str
+class Tokens:
+    bg: str; bg2: str; surface: str; surface2: str
+    border: str; border2: str
+    ink: str; ink2: str; ink3: str; ink4: str
+    accent: str; accent_fg: str
+    sq_light: str; sq_dark: str
+    hl_select: str; hl_move: str; hl_last: str; hl_check: str
+    success: str; warning: str; danger: str
 
 
-DARK_THEME = ColorPalette(
-    bg_darkest   = "#0f1117",
-    bg_dark      = "#161b27",
-    bg_medium    = "#1e2535",
-    bg_light     = "#2a3348",
-    bg_highlight = "#323d54",
-
-    text_primary   = "#e8eaf0",
-    text_secondary = "#9ba5b8",
-    text_muted     = "#5c6882",
-    text_inverse   = "#0f1117",
-
-    accent       = "#4f8ef7",
-    accent_hover = "#6fa3ff",
-    accent_dim   = "#1e3a6a",
-
-    success = "#4caf87",
-    warning = "#f0a040",
-    danger  = "#e05050",
-    info    = "#6ab0e8",
-
-    board_light  = "#d4b896",
-    board_dark   = "#8b6347",
-    board_border = "#2a3348",
-
-    hl_selected  = "#4f8ef780",
-    hl_legal     = "#4f8ef750",
-    hl_last_from = "#ffe17740",
-    hl_last_to   = "#ffe17760",
-    hl_check     = "#e0505080",
-
-    piece_white  = "#f0ece4",
-    piece_black  = "#2c2c2c",
-    piece_outline= "#1a1a1a",
-
-    eval_white = "#e8eaf0",
-    eval_black = "#2c2c2c",
-
-    separator = "#2a3348",
+DARK = Tokens(
+    bg="#0f0e0c", bg2="#171613", surface="#1a1916", surface2="#221f1b",
+    border="#2a2822", border2="#3a3830",
+    ink="#f0ede6", ink2="#c6c0b4", ink3="#7a7468", ink4="#4a4840",
+    accent="#f0ede6", accent_fg="#0f0e0c",
+    sq_light="#c9b99a", sq_dark="#6b5040",
+    hl_select="rgba(210,165,70,0.52)", hl_move="rgba(210,165,70,0.36)",
+    hl_last="rgba(210,165,70,0.28)", hl_check="rgba(185,55,55,0.55)",
+    success="#4a8c6a", warning="#b07a30", danger="#a04040",
 )
 
-LIGHT_THEME = ColorPalette(
-    bg_darkest   = "#e8eaed",
-    bg_dark      = "#f0f2f5",
-    bg_medium    = "#ffffff",
-    bg_light     = "#dce0e8",
-    bg_highlight = "#c8d0de",
-
-    text_primary   = "#1a1d24",
-    text_secondary = "#4a5568",
-    text_muted     = "#8896a8",
-    text_inverse   = "#ffffff",
-
-    accent       = "#2563eb",
-    accent_hover = "#1d4ed8",
-    accent_dim   = "#dbeafe",
-
-    success = "#16a34a",
-    warning = "#d97706",
-    danger  = "#dc2626",
-    info    = "#0284c7",
-
-    board_light  = "#f0d9b5",
-    board_dark   = "#b58863",
-    board_border = "#c0c8d4",
-
-    hl_selected  = "#2563eb80",
-    hl_legal     = "#2563eb50",
-    hl_last_from = "#f6f66940",
-    hl_last_to   = "#f6f66970",
-    hl_check     = "#dc262660",
-
-    piece_white  = "#fafafa",
-    piece_black  = "#1a1a1a",
-    piece_outline= "#333333",
-
-    eval_white = "#fafafa",
-    eval_black = "#1a1a1a",
-
-    separator = "#dce0e8",
+LIGHT = Tokens(
+    bg="#f4f3ef", bg2="#eceae4", surface="#ffffff", surface2="#f0ede8",
+    border="#e0dbd2", border2="#c8c2b6",
+    ink="#0e0d0b", ink2="#2e2c25", ink3="#6b6760", ink4="#9e9990",
+    accent="#0e0d0b", accent_fg="#f4f3ef",
+    sq_light="#f0e4cc", sq_dark="#9a7a5c",
+    hl_select="rgba(140,95,10,0.42)", hl_move="rgba(140,95,10,0.30)",
+    hl_last="rgba(140,95,10,0.22)", hl_check="rgba(180,40,40,0.38)",
+    success="#166534", warning="#92400e", danger="#991b1b",
 )
 
 
 class Theme:
-    """Global theme manager."""
-
-    _current: ColorPalette = DARK_THEME
-    _is_dark:  bool        = True
+    _tokens: Tokens = DARK
+    _dark: bool = True
 
     @classmethod
-    def current(cls) -> ColorPalette:
-        return cls._current
+    def current(cls) -> Tokens:
+        return cls._tokens
 
     @classmethod
     def is_dark(cls) -> bool:
-        return cls._is_dark
+        return cls._dark
 
     @classmethod
     def set_dark(cls) -> None:
-        cls._current = DARK_THEME
-        cls._is_dark = True
+        cls._tokens = DARK; cls._dark = True
 
     @classmethod
     def set_light(cls) -> None:
-        cls._current = LIGHT_THEME
-        cls._is_dark = False
+        cls._tokens = LIGHT; cls._dark = False
 
     @classmethod
     def toggle(cls) -> None:
-        if cls._is_dark:
-            cls.set_light()
-        else:
-            cls.set_dark()
+        cls.set_light() if cls._dark else cls.set_dark()
 
     @classmethod
     def stylesheet(cls) -> str:
-        """Generate a global QSS stylesheet."""
-        c = cls._current
+        t = cls._tokens
         return f"""
+* {{ outline: none; }}
 QMainWindow, QWidget {{
-    background-color: {c.bg_darkest};
-    color: {c.text_primary};
-    font-family: "Segoe UI", "Inter", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+    background-color: {t.bg};
+    color: {t.ink};
+    font-family: "DM Sans","Segoe UI","Inter",system-ui,sans-serif;
     font-size: 13px;
 }}
-
-QFrame {{
-    background-color: {c.bg_dark};
-    border: none;
-    border-radius: 8px;
+QFrame {{ background-color: transparent; border: none; }}
+QFrame#panel {{
+    background-color: {t.surface};
+    border: 1px solid {t.border};
+    border-radius: 10px;
 }}
-
-QLabel {{
-    background: transparent;
-    color: {c.text_primary};
+QFrame#toolbar {{
+    background-color: {t.bg};
+    border-bottom: 1px solid {t.border};
+    border-radius: 0px;
 }}
-
-QLabel#subtitle, QLabel#muted {{
-    color: {c.text_secondary};
-    font-size: 11px;
-}}
-
+QLabel {{ background: transparent; border: none; color: {t.ink}; }}
 QPushButton {{
-    background-color: {c.bg_medium};
-    color: {c.text_primary};
-    border: 1px solid {c.bg_light};
+    background-color: {t.surface};
+    color: {t.ink2};
+    border: 1px solid {t.border};
     border-radius: 6px;
     padding: 6px 14px;
-    font-weight: 500;
+    font-family: "DM Sans","Segoe UI",system-ui,sans-serif;
     font-size: 12px;
-}}
-
-QPushButton:hover {{
-    background-color: {c.bg_light};
-    border-color: {c.accent};
-}}
-
-QPushButton:pressed {{
-    background-color: {c.accent_dim};
-}}
-
-QPushButton#accent {{
-    background-color: {c.accent};
-    color: {c.text_inverse};
-    border: none;
-    font-weight: 600;
-}}
-
-QPushButton#accent:hover {{
-    background-color: {c.accent_hover};
-}}
-
-QPushButton#danger {{
-    background-color: {c.danger};
-    color: white;
-    border: none;
-}}
-
-QComboBox {{
-    background-color: {c.bg_medium};
-    color: {c.text_primary};
-    border: 1px solid {c.bg_light};
-    border-radius: 6px;
-    padding: 5px 10px;
-    min-width: 100px;
-}}
-
-QComboBox:hover {{
-    border-color: {c.accent};
-}}
-
-QComboBox::drop-down {{
-    border: none;
-    width: 20px;
-}}
-
-QComboBox QAbstractItemView {{
-    background-color: {c.bg_medium};
-    color: {c.text_primary};
-    selection-background-color: {c.accent_dim};
-    border: 1px solid {c.bg_light};
-}}
-
-QListWidget {{
-    background-color: {c.bg_medium};
-    border: 1px solid {c.bg_light};
-    border-radius: 6px;
-    color: {c.text_primary};
-    padding: 4px;
-}}
-
-QListWidget::item {{
-    padding: 4px 8px;
-    border-radius: 4px;
-}}
-
-QListWidget::item:selected {{
-    background-color: {c.accent_dim};
-    color: {c.accent};
-}}
-
-QScrollBar:vertical {{
-    background: {c.bg_dark};
-    width: 6px;
-    border-radius: 3px;
-}}
-
-QScrollBar::handle:vertical {{
-    background: {c.bg_highlight};
-    border-radius: 3px;
+    font-weight: 500;
     min-height: 30px;
 }}
-
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
-    height: 0px;
+QPushButton:hover {{
+    background-color: {t.surface2};
+    border-color: {t.border2};
+    color: {t.ink};
 }}
-
-QProgressBar {{
-    background-color: {c.bg_medium};
+QPushButton:pressed {{ background-color: {t.border}; }}
+QPushButton#accent {{
+    background-color: {t.accent};
+    color: {t.accent_fg};
     border: none;
-    border-radius: 4px;
-    height: 6px;
+    font-weight: 600;
+    padding: 6px 18px;
 }}
-
-QProgressBar::chunk {{
-    background-color: {c.accent};
-    border-radius: 4px;
+QPushButton#accent:hover {{ background-color: {t.ink2}; }}
+QPushButton#accent:pressed {{ background-color: {t.ink}; }}
+QComboBox {{
+    background-color: {t.surface};
+    color: {t.ink2};
+    border: 1px solid {t.border};
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    min-height: 30px;
+    min-width: 110px;
 }}
-
-QSplitter::handle {{
-    background: {c.separator};
-    width: 1px;
-    height: 1px;
+QComboBox:hover {{ border-color: {t.border2}; color: {t.ink}; }}
+QComboBox::drop-down {{ border: none; width: 20px; }}
+QComboBox QAbstractItemView {{
+    background-color: {t.surface};
+    border: 1px solid {t.border2};
+    border-radius: 6px;
+    color: {t.ink};
+    selection-background-color: {t.surface2};
+    selection-color: {t.ink};
+    padding: 4px;
+    outline: none;
 }}
-
-QToolTip {{
-    background-color: {c.bg_medium};
-    color: {c.text_primary};
-    border: 1px solid {c.bg_light};
-    border-radius: 4px;
-    padding: 4px 8px;
+QListWidget {{
+    background-color: transparent;
+    border: none;
+    color: {t.ink};
+    outline: none;
+    font-family: "DM Mono","JetBrains Mono","Consolas",monospace;
     font-size: 12px;
 }}
+QListWidget::item {{
+    padding: 5px 12px;
+    color: {t.ink2};
+    border-bottom: 1px solid {t.border};
+}}
+QListWidget::item:selected {{ background-color: {t.surface2}; color: {t.ink}; }}
+QListWidget::item:hover {{ background-color: {t.surface2}; }}
+QScrollBar:vertical {{
+    background: transparent; width: 4px; margin: 0;
+}}
+QScrollBar::handle:vertical {{
+    background: {t.border2}; border-radius: 2px; min-height: 24px;
+}}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+    height: 0; background: none;
+}}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+    background: none;
+}}
+QScrollArea {{ background: transparent; border: none; }}
+QScrollArea > QWidget > QWidget {{ background: transparent; }}
+QSplitter::handle {{ background-color: {t.border}; }}
+QSplitter::handle:horizontal {{ width: 1px; }}
+QSplitter::handle:vertical {{ height: 1px; }}
+QToolTip {{
+    background-color: {t.surface};
+    color: {t.ink2};
+    border: 1px solid {t.border};
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+}}
+QDialog {{
+    background-color: {t.bg};
+    border: 1px solid {t.border};
+    border-radius: 18px;
+}}
+QTabWidget::pane {{ border: none; border-top: 1px solid {t.border}; }}
+QTabBar {{ background: transparent; }}
+QTabBar::tab {{
+    background: transparent;
+    color: {t.ink4};
+    padding: 8px 16px;
+    font-size: 11px;
+    font-weight: 500;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-right: 2px;
+    font-family: "DM Mono","Consolas",monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}}
+QTabBar::tab:selected {{ color: {t.ink}; border-bottom: 2px solid {t.ink}; }}
+QTabBar::tab:hover:!selected {{ color: {t.ink2}; }}
+QCheckBox {{
+    color: {t.ink2}; background: transparent; spacing: 8px;
+}}
+QCheckBox::indicator {{
+    width: 16px; height: 16px;
+    background-color: {t.surface};
+    border: 1px solid {t.border2};
+    border-radius: 4px;
+}}
+QCheckBox::indicator:checked {{ background-color: {t.accent}; border-color: {t.accent}; }}
 """
 
 
-# ── Typography helpers ─────────────────────────────────────────────────────────
+# Typography constants  (design.md §3)
+FONT_UI   = '"DM Sans","Segoe UI","Inter",system-ui,sans-serif'
+FONT_MONO = '"DM Mono","JetBrains Mono","Consolas",monospace'
 
-FONT_SIZES = {
-    "xs":    10,
-    "sm":    11,
-    "base":  13,
-    "md":    14,
-    "lg":    16,
-    "xl":    20,
-    "2xl":   24,
-    "3xl":   30,
-}
-
-FONT_MONO = '"JetBrains Mono", "Cascadia Code", "Fira Code", "Consolas", monospace'
+# Border radii  (design.md §4)
+R_SM = 6
+R    = 10
+R_LG = 18
